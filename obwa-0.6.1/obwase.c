@@ -284,8 +284,20 @@ int obwase(int argc, char *argv[]) {
   }
 
   // parse options
-  j=1;
-  for(i = 1; i < argc; i++ ) {
+
+  int c;
+
+  while ((c = getopt(argc, argv, "s")) >= 0) {
+    switch (c) {
+    case 's':
+      skipheader = 1;
+      break;
+    default: return 1;
+    }
+  }
+
+  j=optind;
+  for(i = optind; i < argc; i++ ) {
     if(strcmp(argv[i],"aln") == 0) {
       if( (i+1) < argc) {
         j=i+2;
@@ -304,25 +316,26 @@ int obwase(int argc, char *argv[]) {
       else print_bwase_usage(opt);
       continue;
     }
-    if(strcmp(argv[i],"-s") == 0) {
-      skipheader = 1;
-      continue;
-    }
+  }  
+
+  if( (j+1 > argc) || (j+2 < argc) ) {
+    print_bwase_usage(opt);
   }
 
   if(j+1 == argc) {
-    return print_sam_header(argv[j]);
+    if(!skipheader) {
+      print_sam_header(argv[j]);
+    }
+    else {
+      print_bwase_usage(opt);
+    }
   }
-
-  if(j+2 != argc) {
-    print_bwase_usage(opt);
-    return 1;
+  
+  if(j+2 == argc) {
+    // aln + sampe
+    obwase_core(argv[j],argv[j+1],opt,n_occ,skipheader);
   }
-
-  // aln + sampe
-
-  obwase_core(argv[j],argv[j+1],opt,n_occ,skipheader);
-
+  
   // free vars for sampe
 
   free(opt);
