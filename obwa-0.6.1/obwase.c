@@ -21,7 +21,7 @@
 #define PACKAGE_VERSION "0.6.1-r104"
 #endif
 #ifndef BWASE_VERSION
-#define BWASE_VERSION "0.1"
+#define BWASE_VERSION "0.11"
 #endif
 
 void bwa_print_sam_SQ(const bntseq_t *bns);
@@ -55,7 +55,7 @@ void obwase_bwa_cal_pac_pos(const bntseq_t *bns, bwt_t *bwt, int n_seqs, bwa_seq
   // bwt_destroy(bwt);
 }
 
-int obwase_core(char *prefix, char *fn_fa, gap_opt_t *opt, int n_occ) {
+int obwase_core(char *prefix, char *fn_fa, gap_opt_t *opt, int n_occ, int skipheader) {
   // The function has been adapted/merged from bwa_sai2sam_se_core in bwase.c and bwa_aln_core in bwtaln.c
 
   // options from bwa_sai2sam_se_core
@@ -91,8 +91,10 @@ int obwase_core(char *prefix, char *fn_fa, gap_opt_t *opt, int n_occ) {
   // fread(&opt, sizeof(gap_opt_t), 1, fp_sa);
   if (!(opt->mode & BWA_MODE_COMPREAD)) // in color space; initialize ntpac
     ntbns = bwa_open_nt(prefix);
-  bwa_print_sam_SQ(bns);
-  bwa_print_sam_PG();
+  if(!skipheader) {
+    bwa_print_sam_SQ(bns);
+    bwa_print_sam_PG();
+  }
 
   // set ks
   ks = bwa_open_reads(opt->mode, fn_fa);
@@ -200,12 +202,15 @@ int parse_samse(gap_opt_t *opt, char *bwa_rg_line, char *bwa_rg_id, char *args, 
 int print_bwase_usage(gap_opt_t *opt) {
   fprintf(stderr, "\n");
   fprintf(stderr, "Program:  obwase combines \'aln\' and \'samse\' from bwa (version %s) into one command.\n",PACKAGE_VERSION);
+  fprintf(stderr, "          If executed with <prefix> only, returns the sam header.\n");
   fprintf(stderr, "Version:  %s\n",BWASE_VERSION);
   fprintf(stderr, "Contact:  Margus Lukk <margus.lukk@cruk.cam.ac.uk>\n\n");
-  fprintf(stderr, "Usage:    obwase [options] <prefix> <in1.fq>\n");
-  fprintf(stderr, "Options:  aln, samse followed by option flags surrounded by quotes.\n");
+  fprintf(stderr, "Usage:    obwase [options] <prefix> [<in1.fq>]\n");
+  fprintf(stderr, "Options:  aln      takes bwa aln optsions\n");
+  fprintf(stderr, "          bwase    bwa bwase optsions\n");
+  fprintf(stderr, "          -s       skip sam header in output sam file\n\n");
   fprintf(stderr, "Examples: obwase hg19.fa in1.fq\n");
-  fprintf(stderr, "          obwase aln \"-e 2\" bwase \"-n 30\" hg19.fa in1.fq\n\n");
+  fprintf(stderr, "          obwase aln \"-e 2 -t 5\" bwase \"-n 30\" hg19.fa in1.fq\n\n");
   fprintf(stderr, "Options for \'aln\' (bwa version %s):\n\n",PACKAGE_VERSION);
   fprintf(stderr, "         -n NUM    max #diff (int) or missing prob under %.2f err rate (float) [%.2f]\n",
           BWA_AVG_ERR, opt->fnr);
@@ -242,8 +247,19 @@ int print_bwase_usage(gap_opt_t *opt) {
   return 1;
 }
 
+int print_sam_header(char *prefix) {
+  bntseq_t *bns = bns_restore(prefix);
+
+  bwa_print_sam_SQ(bns);
+  bwa_print_sam_PG();
+
+  bns_destroy(bns);
+
+  return 0;
+}
+
 int obwase(int argc, char *argv[]) {
-  int i,j;
+  int i, j, skipheader = 0;
   // vars for aln
 
   gap_opt_t *opt;
@@ -288,6 +304,14 @@ int obwase(int argc, char *argv[]) {
       else print_bwase_usage(opt);
       continue;
     }
+    if(strcmp(argv[i],"-s") == 0) {
+      skipheader = 1;
+      continue;
+    }
+  }
+
+  if(j+1 == argc) {
+    return print_sam_header(argv[j]);
   }
 
   if(j+2 != argc) {
@@ -297,7 +321,7 @@ int obwase(int argc, char *argv[]) {
 
   // aln + sampe
 
-  obwase_core(argv[j],argv[j+1],opt,n_occ);
+  obwase_core(argv[j],argv[j+1],opt,n_occ,skipheader);
 
   // free vars for sampe
 
